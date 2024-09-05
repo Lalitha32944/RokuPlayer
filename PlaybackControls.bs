@@ -1,0 +1,12 @@
+function Player_Controls() as Object
+    if m.Player_Controls = invalid
+        m.Player_Controls = {
+            pause: "pause",
+            play: "play",
+            resume: "resume",
+            stop: "stop",
+            seek: "seek"
+        }
+    end if
+    return m.Player_Controls
+end function

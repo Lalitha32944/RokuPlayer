@@ -1,0 +1,9 @@
+function DrmType() as Object
+    if m.DrmType = invalid
+        m.DrmType = {
+            PlayReady: "PlayReady"
+            Widevine: "Widevine"
+        }
+    end if
+    return m.DrmType
+end function

@@ -1,0 +1,187 @@
+function VideoPlayerItems(playoutData as Object, videoNode as Object) as Object
+    this = {
+        playoutData: playoutData
+        videoNode: videoNode
+        video: invalid
+
+        _init: function() as Void
+            if m.videoNode = invalid OR m.playoutData = invalid
+                return
+            end if
+            m.playoutData = m._updatePlayoutDataWithVideoAsset()
+            m.video = m._createVideoElement(m.playoutData)
+            m.setMute(true)
+        end function
+
+        _updatePlayoutDataWithVideoAsset: function() as Object
+            if m.videoAsset <> invalid
+                m.playoutData.id = m.videoAsset.id
+                m.playoutData.cdns = [{ url: m.videoAsset.deliveryFilePath }]
+                m.playoutData.streamingProtocol = "Dash"
+                m.playoutData.position = m.videoAsset.startTimeInSeconds
+                m.playoutData.positionServer = m.videoAsset.startTimeInSeconds
+                m.playoutData.duration = m.videoAsset.videoDuration
+                m.playoutData.type = "vod"
+
+                if m.videoAsset.videoCodingDrm <> invalid
+                    m.playoutData.drmConfiguration = {
+                        type: m.videoAsset.videoCodingDrm
+                        licenceAcquisitionUrl: m.videoAsset.licensingUrl
+                    }
+                end if
+            end if
+            return m.playoutData
+        end function
+
+        _createVideoElement: function(playoutData as Object) as Object
+            if m.videonode <> invalid
+                video = m.videonode
+            else
+                video = createObject("RoSGNode", "Video")
+                video.id = "video"
+            end if
+            video.enableUI = false
+            video.visible = false
+            video.notificationInterval = 1
+            video.seekMode = "accurate"
+
+            for each headerToAdd in m._getHeadersToAdd(playoutData)
+                video.AddHeader(headerToAdd[0], headerToAdd[1])
+            end for
+            video.content = m._createVideoContent(playoutData)
+
+            if playoutData.type = player_PlaybackType().Linear OR playoutData.type = player_PlaybackType().SingleLiveEvent
+                video.timedMetaDataSelectionKeys = ["*"]
+            end if
+            return video
+        end function
+
+        _getHeadersToAdd: function(playoutData as Object) as Object
+            result = []
+            if playoutData.drmConfiguration <> invalid AND LCase(playoutData.drmConfiguration.type) = LCase(DrmType().Widevine)
+                result.push(["Content-Type", "application/octet-stream"])
+            else
+                result.push(["Content-Type", ""])
+            end if
+            return result
+        end function
+
+        _calculatePlayStart: function(playoutData as Object) as Integer
+            _playStart = 0
+            if playoutData.type = player_PlaybackType().Linear OR playoutData.type = player_PlaybackType().SingleLiveEvent
+                _playStart = 999999
+            else
+                if TypeIsNumber(playoutData.positionServer) AND playoutData.positionServer >= 0
+                    _playStart = playoutData.positionServer
+                else if TypeIsNumber(playoutData.position) AND playoutData.position >= 0
+                    _playStart = playoutData.position
+                end if
+            end if
+            return _playStart
+        end function
+
+        _createVideoContent: function(playoutData as Object) as Object
+            videoContent = createObject("RoSGNode", "ContentNode")
+            videoContent.addFields({ cdn: playoutData.cdns[0] })
+            videoContent.url = playoutData.cdns[0].url
+            videoContent.ForwardQueryStringParams = false
+            videoContent.streamFormat = PlaybackStreamFormat()[playoutData.streamingProtocol]
+            videoContent.playStart = m._calculatePlayStart(playoutData)
+            videoContent.subtitleConfig = { Trackname: "eia608/1" }
+            m._setDrmConfiguration(videoContent, playoutData)
+            videoContent.Live = (playoutData.type = player_PlaybackType().Linear) OR (playoutData.type = player_PlaybackType().SingleLiveEvent)
+            if videoContent.Live AND (LCase(videoContent.streamformat) = PlaybackStreamFormat().Dash OR LCase(videoContent.streamformat) = PlaybackStreamFormat().Hls)
+                videoContent.LiveBoundsPauseBehavior = "pause"
+            end if
+
+            return videoContent
+        end function
+
+        _setDrmConfiguration: function(videoContent as Object, playoutData as Object) as Void
+            if playoutData.drmConfiguration <> invalid
+                if LCase(playoutData.drmConfiguration.type) = LCase(DrmType().PlayReady)
+                    if playoutData.drmConfiguration.customChallengeData <> invalid
+                        videoContent.encodingType = "PlayReadyLicenseAcquisitionAndChallenge"
+                        videoContent.encodingKey = Substitute("{0}%%%{1}", playoutData.drmConfiguration.licenceAcquisitionUrl, playoutData.drmConfiguration.customChallengeData)
+                    else
+                        videoContent.encodingType = "PlayReadyLicenseAcquisition"
+                        videoContent.encodingKey = playoutData.drmConfiguration.licenceAcquisitionUrl
+                    end if
+                else if LCase(playoutData.drmConfiguration.type) = LCase(DrmType().Widevine)
+                    drmParams = {
+                        keySystem: DrmType().Widevine
+                        licenseServerURL: playoutData.drmConfiguration.licenceAcquisitionUrl
+                    }
+                    videoContent.drmParams = drmParams
+                end if
+            end if
+        end function
+
+        setMute: function(isMute as Boolean) as Void
+            if m.video <> invalid
+                m.video.mute = isMute
+            end if
+        end function
+
+        play: function() as Boolean
+            if m.video = invalid
+                return false
+            end if
+            if m.video.state = "playing"
+                return false
+            end if
+
+            m.video.visible = true
+            if m.video.state = "paused"
+                m.video.control = Player_Controls().resume
+            else
+                m.video.visible = true
+                m.video.control = Player_Controls().play
+            end if
+
+            return true
+        end function
+
+        pause: function() as Void
+            if m.video <> invalid AND m.video.state <> "paused"
+                m.video.control = Player_Controls().pause
+            end if
+        end function
+
+        resume: function() as Void
+            if m.video <> invalid AND m.video.state <> "resume"
+                m.video.control = Player_Controls().resume
+            end if
+        end function
+
+        stop: function() as Void
+            if m.video <> invalid AND m.video.state <> "stopped"
+                m.video.control = Player_Controls().stop
+            end if
+        end function
+
+        currentVideoPosition: function()
+            m.currentVideodataPosition = m.video.position
+            return m.currentVideodataPosition
+        end function
+
+        playbackState: function()
+            return m.video.state
+        end function
+
+        seek: function(positionSeconds as Double) as Void
+            if m.video <> invalid
+                if positionSeconds < 0
+                    positionSeconds = 0
+                else if m.video.duration > 0 AND positionSeconds > m.video.duration AND NOT m.video.content.live
+                    positionSeconds = m.video.duration - 1
+                end if
+                m.play()
+                m.video.seek = positionSeconds
+            end if
+        end function
+    }
+
+    this._init()
+    return this
+end function

@@ -1,0 +1,9 @@
+function PlaybackStreamFormat() as Object
+    if m.PlaybackStreamFormat = invalid
+        m.PlaybackStreamFormat = {
+            Hls: "hls"
+            Dash: "dash"
+        }
+    end if
+    return m.PlaybackStreamFormat
+end function
