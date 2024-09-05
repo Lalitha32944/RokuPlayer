@@ -1,0 +1,15 @@
+{
+  "name": "@lalitha32944/rokuplayer",
+  "version": "1.0.0",
+  "description": "RokuPlayer",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "repository": {
+    "url": "git@github.com:Lalitha32944/RokuPlayer.git"
+},
+  "license": "ISC"
+}
